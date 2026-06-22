@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Per-user LaunchAgent template for quayd. install-agent.sh substitutes the
+  __PLACEHOLDERS__ and writes the result to:
+      ~/Library/LaunchAgents/com.example.quay.quayd.plist
+
+  This is a LaunchAgent (per-user), NOT a LaunchDaemon (system). Apple's
+  `container` service is user-scoped, so quayd must run in the same user session.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.quay.quayd</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__BIN__</string>
+        <string>--stacks</string>
+        <string>__STACKS__</string>
+        <string>--interval</string>
+        <string>__INTERVAL__</string>
+    </array>
+
+    <!-- Start at login and keep it alive across crashes. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Throttle restarts so a crash-looping daemon can't spin. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Inherit a sane PATH so `container` (often /usr/local/bin) resolves. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__HOME__/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__</string>
+
+    <!-- launchd captures stderr/stdout to these logs (gitignored if in-repo). -->
+    <key>StandardOutPath</key>
+    <string>__HOME__/.config/quay/quayd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.config/quay/quayd.err.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
