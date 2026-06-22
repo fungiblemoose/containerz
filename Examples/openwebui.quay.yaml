@@ -1,0 +1,29 @@
+# Quay stack file — native format (NOT docker-compose).
+# Managed container will be named:  quay-openwebui-openwebui
+#
+# Bring it up with:
+#   quayd --stacks ./Examples --once        # single reconcile pass
+#   quayd --stacks ./Examples               # supervise continuously
+version: 1
+stack: openwebui
+services:
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    env:
+      - "WEBUI_AUTH=true"
+    volumes:
+      - "openwebui-data:/app/backend/data"   # VERIFY: named-volume:/path mount syntax for apple/container
+    publish:
+      - host: 3000
+        container: 8080
+        protocol: tcp                        # tcp only in v1 (udp out of scope)
+    restart: always                          # always | on-failure | never
+    health:
+      type: http
+      url: "http://127.0.0.1:3000/health"
+      interval_seconds: 30
+      timeout_seconds: 5
+      failures_to_unhealthy: 3
+      failures_to_restart: 6
+volumes:
+  openwebui-data: {}
