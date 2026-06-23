@@ -109,6 +109,25 @@ final class ReconcilerTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    func testHealthCheckThrottledToInterval() async {
+        // interval_seconds = 30; reconcile ticks come faster. The probe should
+        // only fire once per interval, not once per tick.
+        let client = MockContainerClient()
+        client.listResult = [ContainerSummary(name: TestFixtures.containerName, state: .running)]
+        let health = MockHealthChecker(.healthy)
+        let r = makeReconciler(client: client, health: health)
+        let stack = TestFixtures.stack() // intervalSeconds: 30
+
+        let t0 = Date(timeIntervalSince1970: 0)
+        await r.tick(stacks: [stack], now: t0)                       // probes (first time)
+        await r.tick(stacks: [stack], now: t0.addingTimeInterval(5)) // within interval -> skip
+        await r.tick(stacks: [stack], now: t0.addingTimeInterval(20))// within interval -> skip
+        XCTAssertEqual(health.checkCount, 1, "must not re-probe inside the interval")
+
+        await r.tick(stacks: [stack], now: t0.addingTimeInterval(31))// interval elapsed -> probe
+        XCTAssertEqual(health.checkCount, 2, "probes again once the interval elapses")
+    }
+
     func testOrphanLoggedNotRemoved() async {
         let client = MockContainerClient()
         client.listResult = [

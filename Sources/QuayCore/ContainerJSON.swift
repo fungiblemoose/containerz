@@ -2,11 +2,16 @@ import Foundation
 
 /// Defensive parser for `container ls --format json`.
 ///
-/// VERIFY: the exact JSON schema apple/container emits is not stable. Rather than
-/// bind to one Codable shape, we walk the JSON loosely and probe several likely
-/// key names for each field. If the real schema is known, tighten this — but
-/// keeping it lenient means a key rename degrades gracefully (a field goes nil)
-/// instead of failing the whole tick.
+/// CONFIRMED on apple/container 1.0.0 (2026-06): each entry is
+///   { "id": "<name>",
+///     "configuration": { "id": "<name>", "image": { "reference": "<ref>" }, ... },
+///     "status": { "state": "running" | "stopped", ... } }
+/// so name = `configuration.id`, image = `configuration.image.reference`, and
+/// state = `status.state`. There is NO exit code anywhere in `ls` or `inspect`.
+///
+/// We still walk the JSON loosely and probe several key names per field: the CLI
+/// is young and a future rename should degrade a field to nil (and keep the tick
+/// alive) rather than break parsing. The 1.0.0 paths are included in each list.
 enum ContainerJSON {
     static func parse(_ text: String, logger: Logger) -> [ContainerSummary] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

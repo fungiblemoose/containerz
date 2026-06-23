@@ -16,13 +16,18 @@ Quay is **not** a Docker/OrbStack replacement for day-to-day dev work. It's a
 narrow, always-on **service manager** for a self-hosted box. The v1 target
 service is [Open WebUI](https://github.com/open-webui/open-webui).
 
-> ⚠️ **Status of the `container` CLI.** Apple's `container` is young and its
-> flags and JSON output are still changing. Every place Quay shells out to it is
-> marked with a `// VERIFY:` comment describing the flag/shape it assumes. If a
-> call breaks against your installed version, that comment is where to look —
-> the integration layer (`ContainerClient.swift`, `ContainerJSON.swift`) is
-> deliberately thin so a flag change is a one-line fix. **Live `container --help`
-> always wins over what's written here.**
+> ✅ **Verified against `container` 1.0.0** (macOS 26, 2026-06). Every CLI call
+> Quay makes — `ls --all --format json`, `run --detach/--name/--env/--volume/
+> --publish`, `start`, `stop`, `volume create` — was exercised on a real install
+> and behaves as assumed. The integration layer (`ContainerClient.swift`,
+> `ContainerJSON.swift`) stays deliberately thin, and each shell-out keeps a
+> `// VERIFY:` note so a future CLI change is a one-line fix. The tool is still
+> young, so **live `container --help` always wins** after an upgrade.
+>
+> One known platform gap: `container` 1.0.0 reports no exit code in `ls` *or*
+> `inspect`, only a coarse running/stopped state. So `restart: on-failure`
+> can't distinguish a clean stop from a crash and conservatively restarts on any
+> stop (same as `always` for a stopped container). Use `never` to opt out.
 
 ## Requirements
 
@@ -122,10 +127,11 @@ is the **single source of truth** for "is this container mine."
 
 - Lists actual `quay-*` containers. For each desired service:
   - **not present** → create + start
-  - **stopped/exited** → start *if* the restart policy allows
-    (`always`; `on-failure` only on a non-zero exit code; `never` never)
-  - **running** → HTTP health check; after `failures_to_restart` consecutive
-    failures (and if policy allows) → restart (stop then start)
+  - **stopped/exited** → start *if* the restart policy allows (`always` and
+    `on-failure` both restart — see the exit-code gap above; `never` never)
+  - **running** → HTTP health check at the service's `interval_seconds`; after
+    `failures_to_restart` consecutive failures (and if policy allows) → restart
+    (stop then start)
 - **Per-container exponential backoff** (base 2s, ×2, cap 5m, ~10 attempts) so a
   crash-looping image can't pin the CPU. After the cap of attempts the service is
   marked `failed`; a healthy observation resets the backoff.

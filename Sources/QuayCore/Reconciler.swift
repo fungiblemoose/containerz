@@ -39,6 +39,10 @@ public actor Reconciler {
         var runState: ServiceRunState = .pending
         var healthDot: HealthDot = .gray
         var lastError: String?
+        /// When we last ran a health probe. Used to honor the service's
+        /// `interval_seconds` instead of probing on every (faster) reconcile tick.
+        /// Reset to nil on (re)start so health re-evaluates promptly.
+        var lastHealthCheckAt: Date?
     }
 
     private func ensureState(_ name: String) -> ServiceRuntimeState {
@@ -174,6 +178,12 @@ public actor Reconciler {
     }
 
     /// Whether a stopped container should be (re)started given its restart policy.
+    ///
+    /// NOTE: Apple's `container` 1.0.0 does not report an exit code in `ls` *or*
+    /// `inspect` — only a coarse running/stopped state. So `exitCode` is always
+    /// nil in practice today, and `.onFailure` conservatively treats any stop as
+    /// a failure (restart). The exit-code branch is kept so the policy becomes
+    /// precise automatically if/when the CLI starts surfacing exit codes.
     private func shouldStartStopped(policy: RestartPolicy, exitCode: Int?) -> Bool {
         switch policy {
         case .always: return true
@@ -202,7 +212,7 @@ public actor Reconciler {
         s.backoff.recordAttempt(now: now)
         do {
             if create {
-                for vol in spec.volumes { _ = vol } // volumes already ensured at stack level
+                // Volumes are ensured once per stack in tick(); nothing to do here.
                 try await client.run(spec)
             } else {
                 try await client.start(name: spec.name)
@@ -210,6 +220,7 @@ public actor Reconciler {
             s.runState = .starting
             s.healthDot = .yellow
             s.lastError = nil
+            s.lastHealthCheckAt = nil // re-probe health promptly after a (re)start
             logger.info("\(create ? "created+started" : "started") \(spec.name) (attempt \(s.backoff.attempts))")
         } catch {
             s.lastError = "\(error)"
@@ -222,6 +233,16 @@ public actor Reconciler {
     /// Health-evaluate a running container and restart it if it's been failing.
     private func evaluateRunning(service: Service, containerName: String,
                                  state s: inout ServiceRuntimeState, now: Date) async {
+        // Throttle probes to the service's configured interval. Reconcile ticks
+        // are typically faster (default 15s) than a health interval (default 30s);
+        // without this we'd probe every tick and reach `failures_to_restart`
+        // twice as fast as configured. Skipping keeps the last evaluated state.
+        if let h = service.health, let last = s.lastHealthCheckAt,
+           now.timeIntervalSince(last) < TimeInterval(h.intervalSeconds) {
+            return
+        }
+        s.lastHealthCheckAt = now
+
         let result = await health.check(service.health)
         switch result {
         case .notApplicable:
@@ -286,6 +307,7 @@ public actor Reconciler {
             try await client.start(name: containerName)
             s.runState = .starting
             s.healthDot = .yellow
+            s.lastHealthCheckAt = nil // re-probe health promptly after a restart
             logger.warn("restarted \(containerName) (restart #\(s.restartCount), attempt \(s.backoff.attempts))")
         } catch {
             s.lastError = "restart: \(error)"

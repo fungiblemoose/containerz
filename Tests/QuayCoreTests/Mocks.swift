@@ -79,16 +79,21 @@ final class MockContainerClient: ContainerClient, @unchecked Sendable {
     var volumes: [String] { lock.withLock { ensureVolumeCalls } }
 }
 
-/// Health checker that always returns a fixed result.
+/// Health checker that always returns a fixed result and counts probes.
 final class MockHealthChecker: HealthChecking, @unchecked Sendable {
     private let lock = NSLock()
     private var _result: HealthResult
+    private var _checkCount = 0
     init(_ result: HealthResult) { self._result = result }
     var result: HealthResult {
         get { lock.withLock { _result } }
         set { lock.withLock { _result = newValue } }
     }
-    func check(_ spec: HealthSpec?) async -> HealthResult { lock.withLock { _result } }
+    /// Number of times `check` was actually invoked (used to assert throttling).
+    var checkCount: Int { lock.withLock { _checkCount } }
+    func check(_ spec: HealthSpec?) async -> HealthResult {
+        lock.withLock { _checkCount += 1; return _result }
+    }
 }
 
 enum TestFixtures {

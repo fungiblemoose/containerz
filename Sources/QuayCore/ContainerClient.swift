@@ -2,10 +2,12 @@ import Foundation
 
 // MARK: - Container runtime model
 //
-// IMPORTANT: apple/container (macOS 26+) is young and its flags + JSON output are
-// still in flux. Every CLI invocation below is annotated with `// VERIFY:` and
-// the assumption it encodes. When running on a real install, run the matching
-// `container <cmd> --help` and reconcile. Live `--help` always wins over memory.
+// VERIFIED against apple/container 1.0.0 (2026-06): every CLI invocation below
+// was exercised on a real macOS 26 install — `ls --all --format json`, `run
+// --detach/--name/--env/--volume/--publish host:cont/tcp`, `start`, `stop`, and
+// `volume create` all behave as used here. The `// VERIFY:` notes record the
+// exact flag/shape each call assumes; re-check them with `container <cmd> --help`
+// after a CLI upgrade, since the tool is still young. Live `--help` wins.
 //
 // This whole layer is deliberately thin and isolated so adjusting a flag or a
 // JSON key is a one-line change that doesn't ripple into the reconciler.
