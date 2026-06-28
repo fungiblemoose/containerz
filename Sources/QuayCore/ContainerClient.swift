@@ -51,13 +51,18 @@ public struct ContainerSpec: Sendable, Equatable {
     public var env: [String]
     public var volumes: [String]
     public var publish: [PortPublish]
+    public var memory: String?   // optional -m/--memory cap
+    public var cpus: Int?        // optional -c/--cpus cap
 
-    public init(name: String, image: String, env: [String], volumes: [String], publish: [PortPublish]) {
+    public init(name: String, image: String, env: [String], volumes: [String], publish: [PortPublish],
+                memory: String? = nil, cpus: Int? = nil) {
         self.name = name
         self.image = image
         self.env = env
         self.volumes = volumes
         self.publish = publish
+        self.memory = memory
+        self.cpus = cpus
     }
 }
 
@@ -131,6 +136,12 @@ public struct CLIContainerClient: ContainerClient {
             // VERIFY: `--publish host:container[/proto]`. UDP + privileged ports
             // (<1024) are intentionally NOT emitted here (out of scope for v1).
             args += ["--publish", "\(p.host):\(p.container)/tcp"]
+        }
+        if let memory = spec.memory {
+            args += ["--memory", memory] // VERIFY: `-m/--memory <size>` accepts e.g. 256m, 1g (1MiB granularity).
+        }
+        if let cpus = spec.cpus {
+            args += ["--cpus", String(cpus)] // VERIFY: `-c/--cpus <n>` integer vCPU count.
         }
         args.append(spec.image)
         let r = try await runner.run(executable, args)

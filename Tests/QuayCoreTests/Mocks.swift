@@ -96,6 +96,20 @@ final class MockHealthChecker: HealthChecking, @unchecked Sendable {
     }
 }
 
+/// Records the argv handed to a CLI so we can assert exactly what `container`
+/// would be invoked with, without shelling out.
+final class RecordingRunner: CommandRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _calls: [(executable: String, args: [String])] = []
+    private let result: CommandResult
+    init(result: CommandResult = CommandResult(exitCode: 0, stdout: "", stderr: "")) { self.result = result }
+    var calls: [(executable: String, args: [String])] { lock.withLock { _calls } }
+    func run(_ executable: String, _ args: [String]) async throws -> CommandResult {
+        lock.withLock { _calls.append((executable, args)) }
+        return result
+    }
+}
+
 enum TestFixtures {
     /// A one-service stack used across reconciler tests.
     static func stack(restart: RestartPolicy = .always,

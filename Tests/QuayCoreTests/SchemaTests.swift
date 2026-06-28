@@ -67,6 +67,27 @@ final class SchemaTests: XCTestCase {
         XCTAssertEqual(svc.publish[0].proto, .tcp, "protocol defaults to tcp")
     }
 
+    func testParsesResourceCaps() throws {
+        let yaml = """
+        stack: dns
+        services:
+          pihole:
+            image: pihole/pihole:latest
+            memory: "256m"
+            cpus: 1
+        """
+        let svc = try XCTUnwrap(StackLoader.parse(yaml).services["pihole"])
+        XCTAssertEqual(svc.memory, "256m")
+        XCTAssertEqual(svc.cpus, 1)
+    }
+
+    func testResourceCapsDefaultToNil() throws {
+        let yaml = "stack: s\nservices:\n  s:\n    image: img\n"
+        let svc = try XCTUnwrap(StackLoader.parse(yaml).services["s"])
+        XCTAssertNil(svc.memory, "memory unset -> runtime default")
+        XCTAssertNil(svc.cpus, "cpus unset -> runtime default")
+    }
+
     func testHealthDefaultsWhenPartiallySpecified() throws {
         let yaml = """
         stack: h

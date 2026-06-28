@@ -46,22 +46,32 @@ public struct Service: Codable, Sendable, Equatable {
     public var publish: [PortPublish]
     public var restart: RestartPolicy
     public var health: HealthSpec?
+    /// Optional resource caps passed straight to `container run`. Both are
+    /// omitted (runtime default) when absent. A small cap keeps a long-running
+    /// service's VM from ballooning — a DNS appliance, say, is happy in
+    /// `memory: "256m"`.
+    public var memory: String?   // `-m/--memory`, e.g. "256m", "1g" (1MiB granularity)
+    public var cpus: Int?        // `-c/--cpus`, vCPU count
 
     public init(image: String,
                 env: [String] = [],
                 volumes: [String] = [],
                 publish: [PortPublish] = [],
                 restart: RestartPolicy = .always,
-                health: HealthSpec? = nil) {
+                health: HealthSpec? = nil,
+                memory: String? = nil,
+                cpus: Int? = nil) {
         self.image = image
         self.env = env
         self.volumes = volumes
         self.publish = publish
         self.restart = restart
         self.health = health
+        self.memory = memory
+        self.cpus = cpus
     }
 
-    enum CodingKeys: String, CodingKey { case image, env, volumes, publish, restart, health }
+    enum CodingKeys: String, CodingKey { case image, env, volumes, publish, restart, health, memory, cpus }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -72,6 +82,9 @@ public struct Service: Codable, Sendable, Equatable {
         // Default restart policy is `always` when the key is absent.
         self.restart = try c.decodeIfPresent(RestartPolicy.self, forKey: .restart) ?? .always
         self.health = try c.decodeIfPresent(HealthSpec.self, forKey: .health)
+        // Resource caps are optional; nil means "let the runtime decide".
+        self.memory = try c.decodeIfPresent(String.self, forKey: .memory)
+        self.cpus = try c.decodeIfPresent(Int.self, forKey: .cpus)
     }
 }
 

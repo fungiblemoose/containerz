@@ -103,6 +103,8 @@ services:
         container: 8080
         protocol: tcp           # default tcp
     restart: always             # always | on-failure | never  (default always)
+    memory: "1g"                # optional -m/--memory cap (e.g. 256m, 1g); omit = runtime default
+    cpus: 2                     # optional -c/--cpus vCPU cap; omit = runtime default
     health:
       type: http                # http only in v1
       url: "http://127.0.0.1:3000/health"
@@ -113,6 +115,12 @@ services:
 volumes:
   openwebui-data: {}
 ```
+
+`memory` / `cpus` are optional caps passed straight to `container run` (`-m`/`-c`).
+Because each apple/container service runs in its **own VM**, an unbounded cap lets
+a long-running guest's kernel caches grow to the default allocation; a small cap
+(e.g. `memory: "256m"` for a DNS appliance) keeps that footprint tight. Verified
+against container 1.0.0: `--memory 256m --cpus 1` → an allocation of 256 MB / 1 vCPU.
 
 **Defaults:** missing keys are filled in by custom decoders, not rejected —
 `version` ⇒ 1, `restart` ⇒ `always`, `protocol` ⇒ `tcp`, and the health integers

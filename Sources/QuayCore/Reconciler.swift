@@ -141,7 +141,8 @@ public actor Reconciler {
                                   now: Date) async -> ServiceStatus {
         var s = ensureState(containerName)
         let spec = ContainerSpec(name: containerName, image: service.image,
-                                 env: service.env, volumes: service.volumes, publish: service.publish)
+                                 env: service.env, volumes: service.volumes, publish: service.publish,
+                                 memory: service.memory, cpus: service.cpus)
 
         switch summary?.state {
         case .none:
